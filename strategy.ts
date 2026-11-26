@@ -4,7 +4,7 @@
 // exactly 10 slots old: its opening tape must show real breadth (at least 5
 // distinct non-creator buyers, at least 1 SOL net inflow, creator has not sold)
 // while its price is still at most 1.6x its create price — a confirmed mover
-// that has not topped yet. The buy is a single 0.2 SOL order (no adds, no
+// that has not topped yet. The buy is a single 0.05 SOL order (no adds, no
 // pyramid). The position is sold whole on the first of: a 25% trailing stop
 // from its best close value, a 15% hard stop against cost, a creator sell
 // while held, or 600 slots held. Buys take full slippage tolerance (a buy
@@ -12,10 +12,26 @@
 // A tiny probe (0.02 SOL, at most 1 at a time) keeps the run on guardrail pace
 // when fills/coins lag the target pace in block time.
 //
+// Round 1 (iter1): stake 0.05 SOL/coin (Fase 1 v2: v1's 0.2 SOL = 2% of the
+// 10 SOL bankroll, 4x the 0.5%/coin rule). The harness caps open positions at
+// 5, so at most 0.25 SOL (2.5% of bankroll) is deployed at once — the 10
+// position cap from the Fase 1 note never binds. Entry/exit rules unchanged.
+//
+// Round 3: maxProbes 1 -> 0 (DISABLE the guardrail probe). The probe was a
+// 0.02 SOL buy on ANY traded mint (no entry filters) fired whenever fills or
+// coins lagged the target pace, sold immediately — pure fee drag. Sweep:
+// maxProbes 0 -> dev mean +0.441, exBest +0.022 (POSITIVE, first time),
+// 41 fills / 21 coins / 22 trips / 8 wins; vs maxProbes 1 -> +0.327,
+// exBest -0.092, 275 fills / 60 coins / 139 trips / 16 wins. The ~117 probe
+// round trips cost ~0.114 SOL in fees. Guardrail check: min_fills = 0,
+// min_distinct_mints = 20 — dev gives 21 coins, just above the line (watch
+// this on resampled windows). Exit knobs (trail/SL/maxHold) are all dead:
+// the coins barely move (~1% drift), so no exit parameter binds.
+//
 // Chosen on the dev window by sweeping the entry band (not the single best
 // cell): the (maxPriceMult 1.6-1.8, minAge 10) plateau is positive, and the
 // exit params are flat across trail 0.2-0.4 / stopLoss 0.15-0.2 / hold 600-1500.
-// Dev: net +0.49 SOL, 143 trips, 18 wins, max drawdown 2.2% (local sim).
+// Dev (v1, 0.2 SOL): net +0.49 SOL, 143 trips, 18 wins, max drawdown 2.2% (local sim).
 // Deterministic by construction: no clock, no randomness, no network, no env;
 // iteration only over insertion-ordered maps fed by the batch stream.
 
@@ -56,11 +72,11 @@ export interface Params {
 export const DEFAULT_PARAMS: Params = {
   minAge: 10,
   maxAge: 10,
-  minBuyers: 5,
+  minBuyers: 8,
   minNetSol: 1.0,
   maxPriceMult: 1.6,
   minRqSol: 0.3,
-  stakeSol: 0.2,
+  stakeSol: 0.05,
   minBuySol: 0.05,
   buySlipBps: 10_000,
   trail: 0.25,
@@ -70,7 +86,7 @@ export const DEFAULT_PARAMS: Params = {
   targetCoins: 25,
   targetFills: 240,
   paceSecs: 14400,
-  maxProbes: 1,
+  maxProbes: 0,
 };
 
 const LAMPORTS = 1e9;
@@ -230,7 +246,7 @@ export function createStrategy(p: Params = DEFAULT_PARAMS): Bot {
         if (!selling) probes.set(mint, true);
       }
 
-      // Entries: one 0.2 SOL buy per coin, age 3-10 slots, early-breadth filters.
+      // Entries: one 0.05 SOL buy per coin, age 3-10 slots, early-breadth filters.
       let free = Number(state.freeCashLamports()) / LAMPORTS;
       let slotsLeft = state.hello.caps.max_open_positions - state.committedPositionCount();
       for (const mint of traded) {

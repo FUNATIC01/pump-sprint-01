@@ -15,21 +15,24 @@ mengabaikan latensi 2 slot, self-impact, dan cap 1% real reserve.
 ## Desain final (DEFAULT_PARAMS)
 
 - Entry sekali per koin, diputus **tepat di umur 10 slot** sejak CreateEvent,
-  lolos semua filter: ≥5 distinct non-creator buyer, net inflow ≥1,0 SOL,
+  lolos semua filter: ≥8 distinct non-creator buyer (Ronde 2: 5 → 8, puncak
+  sweep), net inflow ≥1,0 SOL,
   creator belum jual, harga vs create ≤**1,6x**, real SOL ≥0,3 SOL.
   Tape di-prune ke 50 slot terakhir.
-- Size: satu buy 0,2 SOL per koin, dibatasi 1% real reserve dan kas bebas
-  dikurangi tx fee. Tidak ada pyramid/add.
+- Size: satu buy 0,05 SOL per koin, dibatasi 1% real reserve dan kas bebas
+  dikurangi tx fee. Tidak ada pyramid/add. (Round 1 iterasi: 0,2 → 0,05 SOL;
+  v1 0,2 SOL = 2% modal, 4x aturan maks 0,5%/koin. Harness cap 5 posisi
+  terbuka, jadi maksimal 0,25 SOL = 2,5% modal yang ter-deploy.)
 - Exit (dicek tiap batch, exit dulu sebelum entry): trailing stop 25% dari
   nilai tutup tertinggi sejak entry; hard stop **15%** dari cost; jual segera
   saat creator sell; max hold 600 slot. Nilai tutup dihitung
   `tokens*vq/(vt+tokens)*(1-0,0125) - txFee`, pakai marks bila ada, else curve.
   Buy slippage **10000 bps** (buy yang ditolak karena harga bergerak saat
   latensi justru membuang runner tercepat); sell 10000 bps.
-- Guardrail: trade utama 0,2 SOL (>>0,01 SOL) jadi 20-koin guardrail
-  terpenuhi dari trade biasa; probe 0,02 SOL (maks 1 bersamaan) hanya sebagai
-  asuransi pacing (target 25 koin / 240 fills per 14.400 dtk block time),
-  mengikuti pola pacing momentum.
+- Guardrail: trade utama 0,05 SOL (>>0,01 SOL). **Probe DIMATIKAN (Ronde 3,
+  maxProbes 0)** — probe 0,02 SOL ternyata pure fee drag (~0,114 SOL);
+  20-koin guardrail terpenuhi dari trade biasa saja (20 koin di dev — mepet,
+  perhatikan di window lain).
 - Deterministik: tanpa jam, tanpa random, tanpa network/env; iterasi hanya
   Map insertion-order dari stream batch. Buy yang gagal (seeded failed tx
   2%) tidak dihitung sebagai entry — koin boleh dicoba lagi selama masih
